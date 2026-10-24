@@ -658,7 +658,7 @@ textarea.input{height:auto;padding:10px 12px;}
               <div class="field"><label class="label">Start date *</label><input class="input" type="date" id="nb-start"></div>
               <div class="field"><label class="label">Financing partner *</label><select class="select" id="nb-bank"><option value="">Select bank…</option></select></div>
               <div class="field"><label class="label">Due day</label><input class="input" id="nb-dueday" readonly placeholder="From the bank"></div>
-              <div class="field"><label class="label">Portal password</label><input class="input" id="nb-password" value="1234"></div>
+              <div class="field"><label class="label">Portal PIN</label><input class="input" id="nb-password" value="Random, generated for you" disabled><div class="tiny muted" style="margin-top:4px;">A private 4-digit PIN is made for each borrower, emailed to them and shown to you once after saving.</div></div>
             </div>
             <div class="tiles" style="margin:18px 0 16px;">
               <div class="tile t-primary"><div class="t-l">Monthly amortization</div><div class="t-v num" id="nb-amort">₱0.00</div></div>
@@ -806,6 +806,15 @@ textarea.input{height:auto;padding:10px 12px;}
                 monthly amortization field. The schedule then bills that amount every month, producing balances many times
                 larger than the loan itself. This finds those loans and shows what each figure should be.
                 Nothing is changed until you choose to apply it.</div>
+            </div>
+          </div>
+          <div class="card" style="margin-top:16px;">
+            <div class="card-head"><div><div class="card-title">Weak borrower passwords</div>
+              <div class="card-desc">Finds borrowers still on the old default password 1234.</div></div>
+              <button class="btn btn-outline btn-sm" id="weak-run">Check</button></div>
+            <div class="card-body" id="weak-body">
+              <div class="sm muted" style="line-height:1.7;">Older accounts were created with the same password, 1234. This lists them and, when you choose,
+                gives each one a random 4-digit PIN and emails it to the borrower. Their old password stops working.</div>
             </div>
           </div>
         </div>
@@ -1456,7 +1465,7 @@ function signIn() {
   var done = busy($('btn-signin'), 'Signing in…');
   google.script.run.withSuccessHandler(function(res) {
     done();
-    if (!res || !res.success) { showAlert('auth-alert', 'err', "That email and password don't match."); return; }
+    if (!res || !res.success) { showAlert('auth-alert', 'err', res && res.locked && res.msg ? res.msg : "That email and password don't match."); return; }
     SESSION.email = res.email; SESSION.role = res.role;
     if (res.role === 'ADMIN') { showScreen('admin'); startAdmin(); }
     else { showScreen('portal'); startPortal(); }
@@ -2039,8 +2048,7 @@ function saveNewBorrower() {
   var d = {
     name: $('nb-name').value.trim(), email: $('nb-email').value.trim(),
     contact: $('nb-contact').value.trim(), idNum: $('nb-id').value.trim(),
-    address: $('nb-address').value.trim(), ccEmail: $('nb-cc').value.trim(),
-    password: $('nb-password').value.trim() || '1234'
+    address: $('nb-address').value.trim(), ccEmail: $('nb-cc').value.trim()
   };
   if (!d.name || !d.email || !d.contact || !d.address || !f.loanName || !f.loanType || f.principal <= 0 || f.terms <= 0 || !f.startDate || !f.bank) {
     showAlert('nb-alert', 'err', 'Fill in every field marked with *.'); return;
@@ -2050,11 +2058,12 @@ function saveNewBorrower() {
   google.script.run.withSuccessHandler(function(res) {
     done();
     if (!res || !res.success) { showAlert('nb-alert', 'err', res ? res.msg : 'Something went wrong.'); return; }
-    showAlert('nb-alert', 'ok', d.name + ' is set up. Welcome email sent.');
+    var okMsg = d.name + ' is set up. Welcome email sent.' + (res.pin ? ' Portal PIN: ' + res.pin + ' (also in their email; it is not shown again).' : '');
+    showAlert('nb-alert', 'ok', okMsg);
     toast('ok', 'Borrower added', 'Welcome email sent to ' + d.email);
     confetti({ particleCount: 90, spread: 65, origin: { y: .6 } });
     loadAdminList();
-    setTimeout(clearNewForm, 2200);
+    setTimeout(function() { clearNewForm(); showAlert('nb-alert', 'ok', okMsg); }, 2200);
   }).withFailureHandler(function(e) { done(); showAlert('nb-alert', 'err', e.message); }).addNewBorrower(d);
 }
 var LATE_FEE_DEFAULT = null;
@@ -2069,7 +2078,7 @@ function clearNewForm() {
   ['nb-name','nb-email','nb-contact','nb-id','nb-address','nb-cc','nb-loanname','nb-principal','nb-rate','nb-terms','nb-dueday']
     .forEach(function(id) { $(id).value = ''; });
   $('nb-loantype').value = ''; $('nb-bank').value = ''; $('nb-fee').value = '0'; $('nb-latefee').value = '0'; applyLateFeeDefault(['nb-latefee']); $('nb-bankmonthly').value = '0'; $('nb-bankrate').value = ''; $('nb-bankfee').value = '0'; $('nb-bankterms').value = '';
-  $('nb-password').value = '1234'; $('nb-start').value = new Date().toISOString().slice(0, 10);
+  $('nb-start').value = new Date().toISOString().slice(0, 10);
   clearAlert('nb-alert'); previewLoan('nb');
 }
 
@@ -3341,6 +3350,34 @@ function applyAudit() {
     .fixLoanAmortizations();
 }
 
+
+/* ---------- weak (default) borrower passwords ---------- */
+function runWeakCheck() {
+  var btn = $('weak-run'), done = busy(btn, 'Checking\u2026');
+  google.script.run.withSuccessHandler(function(a) {
+    done();
+    if (!a || !a.success) { $('weak-body').innerHTML = emptyState('alert', 'Check failed', a ? a.msg : ''); return; }
+    if (!a.count) { $('weak-body').innerHTML = '<div class="alert alert-ok show">' + icon('check') + '<span><span class="strong">None found.</span> Nobody is on 1234 (' + a.total + ' borrower login' + (a.total === 1 ? '' : 's') + ' checked).</span></div>'; return; }
+    $('weak-body').innerHTML =
+      '<div class="alert alert-warn show" style="margin-bottom:12px;">' + icon('alert') + '<span><span class="strong">' + a.count + ' borrower' + (a.count === 1 ? '' : 's') + ' still use 1234.</span></span></div>' +
+      '<div class="sm" style="line-height:1.8;margin-bottom:12px;">' + a.users.map(function(u) { return esc(u.name || u.email) + ' <span class="muted">(' + esc(u.email) + ')</span>'; }).join('<br>') + '</div>' +
+      '<div class="row-between" style="gap:10px;"><span class="tiny muted" style="flex:1;">Each gets a new random PIN by email. Their current password stops working.</span>' +
+      '<button class="btn btn-primary btn-sm" id="weak-apply">Replace and email ' + a.count + ' PIN' + (a.count === 1 ? '' : 's') + '</button></div>';
+    $('weak-apply').addEventListener('click', applyWeakReset);
+  }).withFailureHandler(function(e) { done(); $('weak-body').innerHTML = emptyState('alert', 'Check failed', e.message); }).auditWeakPasswords();
+}
+function applyWeakReset() {
+  var btn = $('weak-apply'), done = busy(btn, 'Sending\u2026');
+  google.script.run.withSuccessHandler(function(r) {
+    done();
+    if (!r || !r.success) { toast('err', "Couldn't replace", r ? r.msg : ''); return; }
+    $('weak-body').innerHTML = '<div class="alert alert-ok show">' + icon('check') + '<span><span class="strong">' + r.changed + ' PIN' + (r.changed === 1 ? '' : 's') + ' replaced.</span> ' + r.emailed + ' emailed.' +
+      (r.failed && r.failed.length ? ' These emails failed, so ask them to use Forgot password: ' + r.failed.map(esc).join(', ') + '.' : '') + '</span></div>';
+    toast('ok', 'PINs replaced', r.emailed + ' of ' + r.changed + ' emailed.');
+  }).withFailureHandler(function(e) { done(); toast('err', "Couldn't replace", e.message); }).resetWeakPasswords();
+}
+document.addEventListener('click', function(e) { if (e.target.closest && e.target.closest('#weak-run')) runWeakCheck(); });
+
 function renderUserList(users) {
   var el = $('user-list');
   if (!users || !users.length) { el.innerHTML = emptyState('user', 'No logins yet', 'Adding a borrower creates their login automatically.'); return; }
@@ -3651,7 +3688,7 @@ function sendResetPin() {
   google.script.run.withSuccessHandler(function(res) {
     done();
     if (res && res.success) {
-      showAlert('fg-alert', 'ok', 'PIN sent. Check your inbox, then sign in with it.');
+      showAlert('fg-alert', 'ok', (res.msg || 'If that email has an account, a new PIN is on its way.') + ' Check your inbox, then sign in with it.');
       $('in-email').value = email; $('in-pass').value = '';
       setTimeout(function() { closeDialog('dlg-forgot'); clearAlert('fg-alert'); }, 2600);
     } else showAlert('fg-alert', 'err', res ? res.msg : 'Something went wrong.');

@@ -18,6 +18,7 @@ You can deploy from your terminal (section 3) or let Vercel deploy automatically
    values ('you@email.com', 'PASTE-THE-HASH-HERE', 'ADMIN');
    ```
    Never save the password or the hash in the project folder or in Git.
+5. **Turn on sign-in protection:** SQL Editor -> paste `login-lockout.sql` -> **Run**.
 
 ## 2. Resend (the sender)
 1. resend.com -> sign up -> **Domains -> Add** -> enter your domain (e.g. `reycredits.com`).
@@ -103,10 +104,17 @@ Every later change is just `vercel --prod` again.
 | Agreement/SOA attached as PDF | Real PDFs again, generated with @react-pdf/renderer (no headless-Chromium dependency, which doesn't fit comfortably in a serverless function). The in-app "view in browser" version stays a styled HTML page with a Print button; only the email attachment changed. |
 
 ## Known limits — worth knowing, not blocking
-- **Password reset** still overwrites the account's password the moment someone asks for a PIN, so anyone who
-  knows an email can force that person to use the emailed PIN. Same as the old system. Fix later with a
-  separate expiring reset code.
-- **No login rate-limiting.** Add Vercel's firewall rate limit on `/api/rpc` if you want it.
+- **Sign-in protection.** Portal PINs are random 4-digit codes, which is only safe because of the lockout:
+  5 wrong passwords lock an account for 15 minutes, and "Forgot password" is limited to 3 requests an hour.
+  This needs the `login_attempts` table -- run `login-lockout.sql` in the Supabase SQL Editor. Without it the app
+  still works but has no lockout. Admin accounts can't be reset by email; change the admin password in the
+  Supabase table editor (generate the hash as in step 1.4). A determined person can still lock a borrower out for
+  15 minutes by guessing wrongly on purpose; the borrower can wait or use Forgot password.
+- **Password reset** still replaces the password with a new random PIN, so someone who knows a borrower's email
+  can force a new PIN on them (they cannot read it). A separate expiring reset code would fix that.
+- **Old borrowers on 1234.** Accounts created before this change used the password 1234. Settings -> Data health ->
+  *Weak borrower passwords* finds them and gives each a random PIN by email.
+- Also consider a Vercel Firewall rate-limit rule on `/api/rpc` for extra protection.
 - **Vercel's free Hobby plan is for personal, non-commercial use.** A lending business likely needs Pro — check
   their current terms before relying on it.
 - Resend's free tier caps out at 100 emails/day (3,000/month) -- comfortable for this portfolio's size, but worth watching if the borrower list grows a lot.

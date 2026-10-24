@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node tests/engine.test.js && node tests/e2e.test.js && node tests/projection.test.js && node tests/loan-form.test.js && node tests/email-log.test.js && node tests/due-today.test.js && node tests/late-fee.test.js && node tests/late-fee-flow.test.js && node tests/late-fee-notice.test.js && node tests/announcement.test.js && node tests/penalty-due-date.test.js && node tests/money-breakdown.test.js && node tests/money-report.test.js"
+    "test": "node tests/engine.test.js && node tests/e2e.test.js && node tests/projection.test.js && node tests/loan-form.test.js && node tests/email-log.test.js && node tests/due-today.test.js && node tests/late-fee.test.js && node tests/late-fee-flow.test.js && node tests/late-fee-notice.test.js && node tests/announcement.test.js && node tests/penalty-due-date.test.js && node tests/money-breakdown.test.js && node tests/money-report.test.js && node tests/security.test.js"
   },
   "dependencies": {
     "@react-pdf/renderer": "4.9.0",
