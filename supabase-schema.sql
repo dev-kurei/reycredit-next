@@ -112,11 +112,5 @@ insert into config (key, value) values
   ('OFFICE_HOURS',      'Mon - Sat, 8AM - 5PM')
 on conflict (key) do nothing;
 
--- Seed the first admin login so you can get in at all.
--- Email: admin@reycredit.local   Password: changeme123
--- (bcrypt hash, 10 rounds -- generated and verified with bcryptjs before
---  being pasted here, so this genuinely works on first sign-in)
--- CHANGE THIS PASSWORD immediately after signing in.
-insert into users (email, password_hash, role) values
-  ('admin@reycredit.local', '$2a$10$dPRlt02j0Nz80WdLrG..5.BNjMONI3/fIkVNnQdSQtw6Ex2ekCIhu', 'ADMIN')
-on conflict (email) do nothing;
+-- No admin account is seeded here (this file is public). Create your own first
+-- admin after running this file -- see "Create your first admin" in DEPLOY.md.

@@ -1,11 +1,23 @@
-# Rey Credit — Supabase + Vercel deployment (no GitHub)
+# Rey Credit — Supabase + Vercel deployment
 
-Everything below is done from your terminal. You need Node 20 or newer.
+You can deploy from your terminal (section 3) or let Vercel deploy automatically every time you push to GitHub (section 3b). You need Node 20 or newer.
 
 ## 1. Supabase (the database)
 1. supabase.com → **New project**. Save the database password somewhere.
 2. **SQL Editor → New query** → paste all of `supabase-schema.sql` → **Run**.
 3. **Project Settings → API**: copy the **Project URL** and the **service_role** key.
+4. **Create your first admin.** No login is seeded, because this repository is public. On your computer,
+   in the project folder after `npm install`, make a password hash (put your own strong password inside the quotes):
+   ```bash
+   node -e "console.log(require('bcryptjs').hashSync(process.argv[1], 10))" "YOUR-STRONG-PASSWORD"
+   ```
+   Copy the long text it prints (it starts with `$2a$10$`). Then in the Supabase **SQL Editor** run, using your
+   own email and that hash:
+   ```sql
+   insert into users (email, password_hash, role)
+   values ('you@email.com', 'PASTE-THE-HASH-HERE', 'ADMIN');
+   ```
+   Never save the password or the hash in the project folder or in Git.
 
 ## 2. Resend (the sender)
 1. resend.com -> sign up -> **Domains -> Add** -> enter your domain (e.g. `reycredits.com`).
@@ -25,7 +37,7 @@ cd reycredit-next
 npm install
 vercel link                  # answer the prompts; this creates the project
 ```
-Add the six variables (each command asks you to paste the value):
+Add the variables (each command asks you to paste the value):
 ```bash
 vercel env add SUPABASE_URL production
 vercel env add SUPABASE_SERVICE_ROLE_KEY production
@@ -33,12 +45,28 @@ vercel env add SESSION_SECRET production
 vercel env add CRON_SECRET production
 vercel env add RESEND_API_KEY production
 vercel env add RESEND_FROM_EMAIL production
+vercel env add LENDER_SIGNATURE_DATA_URI production
 ```
+`LENDER_SIGNATURE_DATA_URI` is your signature as a `data:image/png;base64,...` text. It is optional (without it
+the agreement has a blank signature line). It is kept here, not in the repository, because the repository is public.
+Keep the text file you generated it from somewhere private, outside the project folder.
+
 Then ship it:
 ```bash
 vercel --prod
 ```
 Every later change is just `vercel --prod` again.
+
+## 3b. Automatic deploys from GitHub (optional, replaces `vercel --prod`)
+1. Push the project to a GitHub repository (the `.gitignore` already keeps `.env*`, `node_modules`, `.vercel`,
+   exports and the local signature file out of it).
+2. Vercel → your project → **Settings → Git → Connect Git Repository** → choose the repo.
+3. Make sure all the environment variables above are set under **Settings → Environment Variables**
+   (they live in Vercel, not in GitHub).
+4. From then on `git add .`, `git commit -m "..."`, `git push` deploys to production automatically.
+   Pushes to other branches create preview deployments.
+5. SQL files (`late-fee.sql`, `bank-cost.sql`, ...) are never run by a deploy. Run them yourself in the Supabase
+   SQL Editor **before** pushing code that needs the new columns.
 
 ## 4. Move your existing data
 1. In the Google Sheet, for each tab: **File → Download → CSV**. Name them exactly
@@ -58,8 +86,8 @@ Every later change is just `vercel --prod` again.
    amortization was typed as the total.
 
 ## 5. Before you tell anyone it's live
-- **Delete the seed admin.** The schema creates `admin@reycredit.local` / `changeme123` so you can get in
-  on a blank database. After you've confirmed your *own* admin login works, run in the Supabase SQL editor:
+- **Check there is no default login.** Older copies of `supabase-schema.sql` seeded `admin@reycredit.local` with a
+  published password. If your database was set up from one, delete it once your *own* admin login works:
   `delete from users where email = 'admin@reycredit.local';`
 - **Settings → Business:** set Portal URL to your new Vercel address, and point your tinyurl at it.
 - Send yourself a test: record a payment on a test borrower and check the receipt arrives.
