@@ -1,0 +1,6 @@
+{
+  "regions": ["sin1"],
+  "crons": [
+    { "path": "/api/cron?job=all", "schedule": "0 1 * * *" }
+  ]
+}

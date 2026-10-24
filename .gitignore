@@ -1,0 +1,33 @@
+# dependencies & build output
+node_modules
+.next
+out
+
+# Vercel local link (project/org ids)
+.vercel
+
+# secrets - NEVER commit these (keys live in Vercel > Settings > Environment Variables)
+.env
+.env.*
+!.env.example
+
+# data exports (borrower records from the Sheets migration, backups)
+export/
+*.csv
+*.xlsx
+*.bak
+
+# packaged builds, logs, test screenshots
+*.zip
+*.log
+npm-debug.log*
+tests/browser/*.png
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+
+# lender signature (public repo) - set LENDER_SIGNATURE_DATA_URI in Vercel instead
+lib/assets/signature.local.js
